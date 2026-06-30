@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f5f7fa" />
+    <title>SplitMoney</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Gemeinsame Abendkasse</p>
+          <h1>SplitMoney</h1>
+        </div>
+        <div class="topbar-actions">
+          <span class="expiry-pill" id="expiryDate">Ablauf: -</span>
+          <button class="button secondary" type="button" data-action="extend-group" id="extendButton" disabled>
+            Eine Woche verlängern
+          </button>
+          <span class="sync-pill" id="syncStatus">Startet</span>
+          <button class="button secondary" type="button" data-action="new-group">Neue Runde</button>
+          <button class="button primary" type="button" data-action="copy-link">Link kopieren</button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel setup-panel" aria-labelledby="eventHeading">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Runde</p>
+              <h2 id="eventHeading">Abend</h2>
+            </div>
+          </div>
+
+          <form class="event-form" id="eventForm">
+            <label>
+              Name
+              <input id="eventTitle" name="title" autocomplete="off" maxlength="80" />
+            </label>
+            <label>
+              Währung
+              <input id="eventCurrency" name="currency" autocomplete="off" maxlength="3" />
+            </label>
+            <button class="button secondary" type="submit">Speichern</button>
+          </form>
+
+          <div class="section-block">
+            <div class="section-title-row">
+              <h3>Personen</h3>
+              <span class="count-badge" id="participantCount">0</span>
+            </div>
+            <form class="inline-form" id="participantForm">
+              <label class="sr-only" for="participantName">Name</label>
+              <input id="participantName" name="name" placeholder="Name" autocomplete="name" maxlength="60" />
+              <button class="button primary" type="submit">Hinzufügen</button>
+            </form>
+            <div class="person-list" id="participantList"></div>
+          </div>
+        </section>
+
+        <section class="panel expense-panel" aria-labelledby="expenseHeading">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Zahlungen</p>
+              <h2 id="expenseHeading">Ausgabe eintragen</h2>
+            </div>
+          </div>
+
+          <form class="expense-form" id="expenseForm">
+            <label class="wide">
+              Beschreibung
+              <input id="expenseTitle" name="title" placeholder="Getränke, Taxi, Pizza" autocomplete="off" maxlength="90" />
+            </label>
+            <label>
+              Betrag
+              <input id="expenseAmount" name="amount" placeholder="0,00" inputmode="decimal" autocomplete="off" />
+            </label>
+            <label>
+              Bezahlt von
+              <select id="expensePayer" name="payer"></select>
+            </label>
+
+            <div class="split-box wide">
+              <label class="check-row">
+                <input id="splitAll" type="checkbox" checked />
+                <span>Alle teilen mit</span>
+              </label>
+              <div class="split-list" id="splitList"></div>
+            </div>
+
+            <button class="button primary wide" type="submit">Ausgabe speichern</button>
+          </form>
+
+          <div class="expense-list" id="expenseList"></div>
+        </section>
+
+        <section class="panel result-panel" aria-labelledby="resultHeading">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Ausgleich</p>
+              <h2 id="resultHeading">Wer überweist wem?</h2>
+            </div>
+            <strong class="total-amount" id="totalAmount">0,00 €</strong>
+          </div>
+
+          <div class="summary-grid" id="summaryGrid"></div>
+
+          <div class="section-block">
+            <div class="section-title-row">
+              <h3>Überweisungen</h3>
+              <span class="count-badge" id="settlementCount">0</span>
+            </div>
+            <div class="settlement-list" id="settlementList"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

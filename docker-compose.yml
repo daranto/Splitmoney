@@ -1,0 +1,11 @@
+services:
+  splitmoney:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - splitmoney-data:/data
+    restart: unless-stopped
+
+volumes:
+  splitmoney-data:
