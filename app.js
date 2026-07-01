@@ -3,6 +3,7 @@ const POLL_INTERVAL_MS = 3500;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_EXPIRY_MS = 28 * DAY_MS;
 const EXTENSION_WINDOW_MS = 7 * DAY_MS;
+const NAME_COLLATOR = new Intl.Collator("de-DE", { sensitivity: "base", numeric: true });
 
 const elements = {
   syncStatus: document.querySelector("#syncStatus"),
@@ -199,6 +200,8 @@ async function extendGroup() {
 
 function deleteParticipant(id) {
   if (!state.participants[id]) return;
+  if (!window.confirm("Wirklich entfernen?")) return;
+
   if (editingParticipantId === id) {
     editingParticipantId = "";
   }
@@ -646,7 +649,10 @@ function isDuplicateName(name, exceptId = "") {
 }
 
 function getParticipants() {
-  return Object.values(state.participants || {}).sort((a, b) => a.createdAt - b.createdAt);
+  return Object.values(state.participants || {}).sort((a, b) => {
+    const byName = NAME_COLLATOR.compare(a.name || "", b.name || "");
+    return byName || a.createdAt - b.createdAt;
+  });
 }
 
 function getGroupIdFromUrl() {
