@@ -499,13 +499,24 @@ function renderParticipants(people, result) {
       if (confirmingDeleteParticipantId === person.id) {
         return `
           <div class="person-row deleting" data-delete-row="${escapeHtml(person.id)}">
-            <div class="person-main">
+            <div class="person-main delete-underlay" aria-hidden="true">
+              <div class="person-name">${escapeHtml(person.name)}</div>
+              <div class="person-meta">Bezahlt: ${formatMoney(paid)} · Anteil: ${formatMoney(owed)}</div>
+            </div>
+            <strong class="person-paid delete-underlay" aria-hidden="true">${formatMoney(paid)}</strong>
+            <div class="row-actions delete-underlay" aria-hidden="true">
+              <button class="icon-button secondary" type="button" tabindex="-1" disabled>✎</button>
+              <button class="icon-button danger" type="button" tabindex="-1" disabled>×</button>
+            </div>
+            <div class="delete-confirmation" role="group" aria-label="${escapeHtml(person.name)} entfernen bestätigen">
+              <div class="delete-confirmation-main">
               <div class="person-name">Wirklich entfernen?</div>
               <div class="person-meta">${escapeHtml(person.name)} wird aus der Runde entfernt.</div>
-            </div>
-            <div class="row-actions">
-              <button class="button small danger" type="button" data-action="confirm-delete-person" data-id="${escapeHtml(person.id)}">Entfernen</button>
-              <button class="button small secondary" type="button" data-action="cancel-delete-person" data-id="${escapeHtml(person.id)}">Abbrechen</button>
+              </div>
+              <div class="row-actions">
+                <button class="button small danger" type="button" data-action="confirm-delete-person" data-id="${escapeHtml(person.id)}">Entfernen</button>
+                <button class="button small secondary" type="button" data-action="cancel-delete-person" data-id="${escapeHtml(person.id)}">Abbrechen</button>
+              </div>
             </div>
           </div>
         `;
