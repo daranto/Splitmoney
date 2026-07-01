@@ -34,6 +34,7 @@ let isSaving = false;
 let isPolling = false;
 let lastSyncedAt = 0;
 let editingParticipantId = "";
+let confirmingDeleteParticipantId = "";
 let entryControlsExpanded = true;
 
 bindEvents();
@@ -133,6 +134,10 @@ function bindEvents() {
       startEditParticipant(id);
     }
 
+    if (action === "start-delete-person") {
+      startDeleteParticipant(id);
+    }
+
     if (action === "save-person") {
       saveParticipantEdit(id);
     }
@@ -141,7 +146,11 @@ function bindEvents() {
       cancelParticipantEdit();
     }
 
-    if (action === "delete-person") {
+    if (action === "cancel-delete-person") {
+      cancelDeleteParticipant();
+    }
+
+    if (action === "confirm-delete-person") {
       deleteParticipant(id);
     }
   });
@@ -209,10 +218,12 @@ async function extendGroup() {
 
 function deleteParticipant(id) {
   if (!state.participants[id]) return;
-  if (!window.confirm("Wirklich entfernen?")) return;
 
   if (editingParticipantId === id) {
     editingParticipantId = "";
+  }
+  if (confirmingDeleteParticipantId === id) {
+    confirmingDeleteParticipantId = "";
   }
   delete state.participants[id];
   persist();
@@ -229,12 +240,25 @@ function toggleEntryControls() {
 
 function startEditParticipant(id) {
   if (!state.participants[id]) return;
+  confirmingDeleteParticipantId = "";
   editingParticipantId = id;
   render();
 }
 
 function cancelParticipantEdit() {
   editingParticipantId = "";
+  render();
+}
+
+function startDeleteParticipant(id) {
+  if (!state.participants[id]) return;
+  editingParticipantId = "";
+  confirmingDeleteParticipantId = id;
+  render();
+}
+
+function cancelDeleteParticipant() {
+  confirmingDeleteParticipantId = "";
   render();
 }
 
@@ -263,6 +287,7 @@ function saveParticipantEdit(id) {
 
   state.participants[id] = { ...person, name, paidCents };
   editingParticipantId = "";
+  confirmingDeleteParticipantId = "";
   persist();
 }
 
@@ -393,6 +418,7 @@ async function fetchJson(url, options = {}) {
 function render() {
   const people = getParticipants();
   const result = calculateResult();
+  syncTransientParticipantState();
 
   setFieldValue(elements.eventTitle, state.title);
   setFieldValue(elements.eventCurrency, state.currency);
@@ -416,6 +442,15 @@ function renderEntryControls(people) {
   elements.entryControlsToggle.hidden = !hasPeople;
   elements.entryControlsToggle.textContent = isExpanded ? "Einklappen" : "Bearbeiten";
   elements.entryControlsToggle.setAttribute("aria-expanded", String(isExpanded));
+}
+
+function syncTransientParticipantState() {
+  if (editingParticipantId && !state.participants[editingParticipantId]) {
+    editingParticipantId = "";
+  }
+  if (confirmingDeleteParticipantId && !state.participants[confirmingDeleteParticipantId]) {
+    confirmingDeleteParticipantId = "";
+  }
 }
 
 function renderExpiry() {
@@ -461,6 +496,20 @@ function renderParticipants(people, result) {
           </div>
         `;
       }
+      if (confirmingDeleteParticipantId === person.id) {
+        return `
+          <div class="person-row deleting" data-delete-row="${escapeHtml(person.id)}">
+            <div class="person-main">
+              <div class="person-name">Wirklich entfernen?</div>
+              <div class="person-meta">${escapeHtml(person.name)} wird aus der Runde entfernt.</div>
+            </div>
+            <div class="row-actions">
+              <button class="button small danger" type="button" data-action="confirm-delete-person" data-id="${escapeHtml(person.id)}">Entfernen</button>
+              <button class="button small secondary" type="button" data-action="cancel-delete-person" data-id="${escapeHtml(person.id)}">Abbrechen</button>
+            </div>
+          </div>
+        `;
+      }
       return `
         <div class="person-row">
           <div class="person-main">
@@ -470,7 +519,7 @@ function renderParticipants(people, result) {
           <strong class="person-paid">${formatMoney(paid)}</strong>
           <div class="row-actions">
             <button class="icon-button secondary" type="button" data-action="start-edit-person" data-id="${escapeHtml(person.id)}" aria-label="${escapeHtml(person.name)} bearbeiten" title="Bearbeiten">✎</button>
-            <button class="icon-button danger" type="button" data-action="delete-person" data-id="${escapeHtml(person.id)}" aria-label="${escapeHtml(person.name)} entfernen" title="Entfernen">×</button>
+            <button class="icon-button danger" type="button" data-action="start-delete-person" data-id="${escapeHtml(person.id)}" aria-label="${escapeHtml(person.name)} entfernen" title="Entfernen">×</button>
           </div>
         </div>
       `;
