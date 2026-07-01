@@ -315,12 +315,20 @@ input:focus {
 }
 
 .person-row.editing {
-  grid-template-columns: minmax(160px, 1fr) minmax(130px, 0.55fr) auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: end;
+  gap: 14px;
 }
 
 .person-row.editing .row-actions {
+  grid-column: 1 / -1;
   align-items: center;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.person-row.editing .button {
+  min-width: 132px;
 }
 
 .summary-row,
@@ -500,6 +508,10 @@ input:focus {
 
   .row-actions {
     justify-content: stretch;
+  }
+
+  .person-row.editing .button {
+    min-width: 0;
   }
 
   .icon-button {
