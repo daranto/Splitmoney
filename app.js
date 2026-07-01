@@ -8,6 +8,8 @@ const NAME_COLLATOR = new Intl.Collator("de-DE", { sensitivity: "base", numeric:
 const elements = {
   syncStatus: document.querySelector("#syncStatus"),
   toast: document.querySelector("#toast"),
+  entryControls: document.querySelector("#entryControls"),
+  entryControlsToggle: document.querySelector("#entryControlsToggle"),
   eventForm: document.querySelector("#eventForm"),
   expiryDate: document.querySelector("#expiryDate"),
   extendButton: document.querySelector("#extendButton"),
@@ -32,6 +34,7 @@ let isSaving = false;
 let isPolling = false;
 let lastSyncedAt = 0;
 let editingParticipantId = "";
+let entryControlsExpanded = true;
 
 bindEvents();
 render();
@@ -122,6 +125,10 @@ function bindEvents() {
       await extendGroup();
     }
 
+    if (action === "toggle-entry-controls") {
+      toggleEntryControls();
+    }
+
     if (action === "start-edit-person") {
       startEditParticipant(id);
     }
@@ -145,6 +152,7 @@ async function loadGroup(groupId) {
   const response = await fetchJson(`${API_BASE}/groups/${encodeURIComponent(groupId)}`);
   state = normalizeState(response.state);
   lastSyncedAt = Number(state.updatedAt) || 0;
+  setDefaultEntryControlsState();
   setGroupUrl(state.id);
   setSyncStatus("Bereit", "cloud", "Alle mit Link können bearbeiten.");
   render();
@@ -165,6 +173,7 @@ async function createNewGroup({ askConfirmation }) {
 
   state = normalizeState(response.state);
   lastSyncedAt = Number(state.updatedAt) || 0;
+  setDefaultEntryControlsState();
   setGroupUrl(state.id);
   render();
   setSyncStatus("Bereit", "cloud", "Alle mit Link können bearbeiten.");
@@ -207,6 +216,15 @@ function deleteParticipant(id) {
   }
   delete state.participants[id];
   persist();
+}
+
+function setDefaultEntryControlsState() {
+  entryControlsExpanded = getParticipants().length === 0;
+}
+
+function toggleEntryControls() {
+  entryControlsExpanded = !entryControlsExpanded;
+  render();
 }
 
 function startEditParticipant(id) {
@@ -384,9 +402,20 @@ function render() {
   elements.settlementCount.textContent = String(result.settlements.length);
 
   renderExpiry();
+  renderEntryControls(people);
   renderParticipants(people, result);
   renderSummary(people, result);
   renderSettlements(result);
+}
+
+function renderEntryControls(people) {
+  const hasPeople = people.length > 0;
+  const isExpanded = entryControlsExpanded || !hasPeople;
+
+  elements.entryControls.hidden = !isExpanded;
+  elements.entryControlsToggle.hidden = !hasPeople;
+  elements.entryControlsToggle.textContent = isExpanded ? "Einklappen" : "Bearbeiten";
+  elements.entryControlsToggle.setAttribute("aria-expanded", String(isExpanded));
 }
 
 function renderExpiry() {

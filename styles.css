@@ -115,6 +115,13 @@ button {
   border-bottom: 1px solid var(--line);
 }
 
+.panel-heading-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
 .panel h2 {
   font-size: 1.25rem;
   line-height: 1.2;
@@ -147,6 +154,10 @@ button {
 .person-form {
   grid-template-columns: minmax(160px, 1fr) minmax(130px, 0.55fr) auto;
   align-items: end;
+}
+
+.entry-controls[hidden] {
+  display: none;
 }
 
 label {
@@ -300,6 +311,10 @@ input:focus {
 
 .person-list {
   padding: 0 20px 20px;
+}
+
+.entry-controls[hidden] + .person-list {
+  padding-top: 20px;
 }
 
 .person-row,
@@ -503,6 +518,15 @@ input:focus {
 
   .person-list {
     padding: 0 16px 16px;
+  }
+
+  .entry-controls[hidden] + .person-list {
+    padding-top: 16px;
+  }
+
+  .panel-heading-actions {
+    align-items: flex-end;
+    flex-direction: column;
   }
 
   .person-row,
