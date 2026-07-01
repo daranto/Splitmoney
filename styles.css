@@ -26,11 +26,16 @@
   box-sizing: border-box;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   min-width: 320px;
   margin: 0;
   background: var(--bg);
   color: var(--ink);
+  overflow-x: hidden;
 }
 
 button,
@@ -160,6 +165,8 @@ input {
   padding: 10px 12px;
   background: #fff;
   color: var(--ink);
+  font-size: 16px;
+  line-height: 1.2;
   outline: none;
 }
 

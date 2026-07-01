@@ -93,7 +93,17 @@ function bindEvents() {
     persist();
   });
 
+  document.addEventListener("focusin", (event) => {
+    if (isAmountInput(event.target)) {
+      moveCursorToEnd(event.target);
+    }
+  });
+
   document.addEventListener("click", async (event) => {
+    if (isAmountInput(event.target)) {
+      moveCursorToEnd(event.target);
+    }
+
     const button = event.target.closest("[data-action]");
     if (!button) return;
 
@@ -606,6 +616,20 @@ function canExtendCurrentGroup() {
 function getEditRow(id) {
   const escapedId = window.CSS?.escape ? CSS.escape(id) : id.replaceAll('"', '\\"');
   return document.querySelector(`[data-edit-row="${escapedId}"]`);
+}
+
+function isAmountInput(target) {
+  return (
+    target instanceof HTMLInputElement &&
+    (target.id === "participantAmount" || target.hasAttribute("data-edit-amount"))
+  );
+}
+
+function moveCursorToEnd(input) {
+  window.setTimeout(() => {
+    const end = input.value.length;
+    input.setSelectionRange(end, end);
+  }, 0);
 }
 
 function cleanName(value) {
