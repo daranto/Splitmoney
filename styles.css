@@ -181,6 +181,12 @@ input:focus {
   padding: 0 14px;
 }
 
+.button.small {
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 0.86rem;
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -306,6 +312,15 @@ input:focus {
   align-items: center;
   gap: 12px;
   padding: 12px;
+}
+
+.person-row.editing {
+  grid-template-columns: minmax(160px, 1fr) minmax(130px, 0.55fr) auto;
+  align-items: end;
+}
+
+.person-row.editing .row-actions {
+  align-items: center;
 }
 
 .summary-row,
@@ -477,7 +492,8 @@ input:focus {
 
   .person-row,
   .summary-row,
-  .settlement-row {
+  .settlement-row,
+  .person-row.editing {
     grid-template-columns: 1fr;
     align-items: stretch;
   }

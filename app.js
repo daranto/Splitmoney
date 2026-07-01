@@ -30,6 +30,7 @@ let toastTimer = 0;
 let isSaving = false;
 let isPolling = false;
 let lastSyncedAt = 0;
+let editingParticipantId = "";
 
 bindEvents();
 render();
@@ -68,11 +69,16 @@ function bindEvents() {
 
   elements.participantForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    const name = elements.participantName.value.trim();
+    const name = cleanName(elements.participantName.value);
     const paidCents = parseMoneyInput(elements.participantAmount.value);
 
     if (!name) {
       showToast("Bitte einen Namen eintragen.");
+      return;
+    }
+
+    if (isDuplicateName(name)) {
+      showToast("Dieser Name ist schon vergeben.");
       return;
     }
 
@@ -105,8 +111,16 @@ function bindEvents() {
       await extendGroup();
     }
 
-    if (action === "edit-person") {
-      editParticipant(id);
+    if (action === "start-edit-person") {
+      startEditParticipant(id);
+    }
+
+    if (action === "save-person") {
+      saveParticipantEdit(id);
+    }
+
+    if (action === "cancel-edit-person") {
+      cancelParticipantEdit();
     }
 
     if (action === "delete-person") {
@@ -173,29 +187,51 @@ async function extendGroup() {
   }
 }
 
-function editParticipant(id) {
+function deleteParticipant(id) {
+  if (!state.participants[id]) return;
+  if (editingParticipantId === id) {
+    editingParticipantId = "";
+  }
+  delete state.participants[id];
+  persist();
+}
+
+function startEditParticipant(id) {
+  if (!state.participants[id]) return;
+  editingParticipantId = id;
+  render();
+}
+
+function cancelParticipantEdit() {
+  editingParticipantId = "";
+  render();
+}
+
+function saveParticipantEdit(id) {
   const person = state.participants[id];
-  if (!person) return;
+  const row = getEditRow(id);
+  if (!person || !row) return;
 
-  const name = window.prompt("Name", person.name)?.trim();
-  if (!name) return;
+  const name = cleanName(row.querySelector("[data-edit-name]")?.value || "");
+  const paidCents = parseMoneyInput(row.querySelector("[data-edit-amount]")?.value || "");
 
-  const paidInput = window.prompt("Bezahlt", formatPlainMoney(person.paidCents || 0));
-  if (paidInput === null) return;
+  if (!name) {
+    showToast("Bitte einen Namen eintragen.");
+    return;
+  }
 
-  const paidCents = parseMoneyInput(paidInput);
+  if (isDuplicateName(name, id)) {
+    showToast("Dieser Name ist schon vergeben.");
+    return;
+  }
+
   if (paidCents === null) {
     showToast("Bitte einen gültigen Betrag eintragen.");
     return;
   }
 
   state.participants[id] = { ...person, name, paidCents };
-  persist();
-}
-
-function deleteParticipant(id) {
-  if (!state.participants[id]) return;
-  delete state.participants[id];
+  editingParticipantId = "";
   persist();
 }
 
@@ -245,8 +281,13 @@ async function saveGroup() {
       showExpired(error.message);
       return;
     }
+    if (error.status === 400) {
+      showToast(error.message || "Speichern ist fehlgeschlagen.");
+      await loadGroup(state.id);
+      return;
+    }
     setSyncStatus("Fehler", "error", "Speichern ist fehlgeschlagen.");
-    showToast("Speichern ist fehlgeschlagen.");
+    showToast(error.message || "Speichern ist fehlgeschlagen.");
   } finally {
     isSaving = false;
   }
@@ -360,6 +401,24 @@ function renderParticipants(people, result) {
     .map((person) => {
       const paid = result.paidByPerson[person.id] || 0;
       const owed = result.owedByPerson[person.id] || 0;
+      if (editingParticipantId === person.id) {
+        return `
+          <div class="person-row editing" data-edit-row="${escapeHtml(person.id)}">
+            <label>
+              Name
+              <input data-edit-name value="${escapeHtml(person.name)}" maxlength="60" autocomplete="off" />
+            </label>
+            <label>
+              Bezahlt
+              <input data-edit-amount value="${escapeHtml(formatPlainMoney(paid))}" inputmode="decimal" autocomplete="off" />
+            </label>
+            <div class="row-actions">
+              <button class="button small primary" type="button" data-action="save-person" data-id="${escapeHtml(person.id)}">Speichern</button>
+              <button class="button small secondary" type="button" data-action="cancel-edit-person" data-id="${escapeHtml(person.id)}">Abbrechen</button>
+            </div>
+          </div>
+        `;
+      }
       return `
         <div class="person-row">
           <div class="person-main">
@@ -368,8 +427,8 @@ function renderParticipants(people, result) {
           </div>
           <strong class="person-paid">${formatMoney(paid)}</strong>
           <div class="row-actions">
-            <button class="icon-button secondary" type="button" data-action="edit-person" data-id="${person.id}" aria-label="${escapeHtml(person.name)} bearbeiten" title="Bearbeiten">✎</button>
-            <button class="icon-button danger" type="button" data-action="delete-person" data-id="${person.id}" aria-label="${escapeHtml(person.name)} entfernen" title="Entfernen">×</button>
+            <button class="icon-button secondary" type="button" data-action="start-edit-person" data-id="${escapeHtml(person.id)}" aria-label="${escapeHtml(person.name)} bearbeiten" title="Bearbeiten">✎</button>
+            <button class="icon-button danger" type="button" data-action="delete-person" data-id="${escapeHtml(person.id)}" aria-label="${escapeHtml(person.name)} entfernen" title="Entfernen">×</button>
           </div>
         </div>
       `;
@@ -542,6 +601,24 @@ function canExtendCurrentGroup() {
   const expiresAt = Number(state.expiresAt || 0);
   const remainingMs = expiresAt - Date.now();
   return Boolean(state.id) && remainingMs > 0 && remainingMs <= EXTENSION_WINDOW_MS;
+}
+
+function getEditRow(id) {
+  const escapedId = window.CSS?.escape ? CSS.escape(id) : id.replaceAll('"', '\\"');
+  return document.querySelector(`[data-edit-row="${escapedId}"]`);
+}
+
+function cleanName(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function normalizeName(value) {
+  return cleanName(value).toLocaleLowerCase("de-DE");
+}
+
+function isDuplicateName(name, exceptId = "") {
+  const normalizedName = normalizeName(name);
+  return getParticipants().some((person) => person.id !== exceptId && normalizeName(person.name) === normalizedName);
 }
 
 function getParticipants() {

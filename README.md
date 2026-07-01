@@ -7,6 +7,7 @@ SplitMoney ist eine kleine Selfhost-App für gemeinsame Ausgaben. Es gibt keinen
 - Eindeutiger Gruppenlink pro Runde
 - Personen mit gezahltem Betrag hinzufügen
 - Namen und gezahlte Beträge bearbeiten
+- Eindeutige Namen, damit Überweisungen klar zugeordnet werden können
 - Personen entfernen
 - Gesamtsumme, Personenbilanz und minimale Überweisungen berechnen
 - Live-Hinweis, bis alle Beträge eingetragen sind

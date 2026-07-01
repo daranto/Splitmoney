@@ -32,7 +32,7 @@ def now_ms():
 def empty_state(group_id):
   timestamp = now_ms()
   return {
-    "version": 1,
+    "version": 2,
     "id": group_id,
     "title": "Abend",
     "currency": "EUR",
@@ -89,6 +89,33 @@ def extend_state(state):
 def sanitize_currency(value):
   currency = str(value or "EUR").strip().upper()
   return currency if re.match(r"^[A-Z]{3}$", currency) else "EUR"
+
+
+def clean_name(value):
+  return re.sub(r"\s+", " ", str(value or "").strip())
+
+
+def normalized_name(value):
+  return clean_name(value).casefold()
+
+
+def validate_state(state):
+  participants = state.get("participants") if isinstance(state, dict) else {}
+  if not isinstance(participants, dict):
+    return None
+
+  seen_names = set()
+  for participant in participants.values():
+    if not isinstance(participant, dict):
+      continue
+    name = normalized_name(participant.get("name"))
+    if not name:
+      return "Alle Personen brauchen einen Namen."
+    if name in seen_names:
+      return "Jeder Name darf nur einmal vorkommen."
+    seen_names.add(name)
+
+  return None
 
 
 def get_connection():
@@ -193,7 +220,13 @@ class SplitMoneyHandler(BaseHTTPRequestHandler):
       return
 
     group_id = make_group_id()
-    state = write_group(group_id, payload.get("state") or empty_state(group_id))
+    proposed_state = payload.get("state") or empty_state(group_id)
+    validation_error = validate_state(proposed_state)
+    if validation_error:
+      self.send_json({"error": validation_error}, HTTPStatus.BAD_REQUEST)
+      return
+
+    state = write_group(group_id, proposed_state)
     self.send_json({"state": state}, HTTPStatus.CREATED)
 
   def handle_update_group(self, group_id):
@@ -216,6 +249,11 @@ class SplitMoneyHandler(BaseHTTPRequestHandler):
     proposed_state = payload.get("state") or empty_state(group_id)
     if isinstance(proposed_state, dict):
       proposed_state["expiresAt"] = current_state.get("expiresAt")
+    validation_error = validate_state(proposed_state)
+    if validation_error:
+      self.send_json({"error": validation_error}, HTTPStatus.BAD_REQUEST)
+      return
+
     state = write_group(group_id, proposed_state)
     self.send_json({"state": state})
 
@@ -282,7 +320,7 @@ class SplitMoneyHandler(BaseHTTPRequestHandler):
     self.send_response(HTTPStatus.OK)
     self.send_header("Content-Type", content_type)
     self.send_header("Content-Length", str(len(body)))
-    self.send_header("Cache-Control", "no-cache" if path.name == "index.html" else "public, max-age=3600")
+    self.send_header("Cache-Control", "no-cache")
     self.end_headers()
     self.wfile.write(body)
 
