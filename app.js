@@ -14,15 +14,9 @@ const elements = {
   eventCurrency: document.querySelector("#eventCurrency"),
   participantForm: document.querySelector("#participantForm"),
   participantName: document.querySelector("#participantName"),
+  participantAmount: document.querySelector("#participantAmount"),
   participantCount: document.querySelector("#participantCount"),
   participantList: document.querySelector("#participantList"),
-  expenseForm: document.querySelector("#expenseForm"),
-  expenseTitle: document.querySelector("#expenseTitle"),
-  expenseAmount: document.querySelector("#expenseAmount"),
-  expensePayer: document.querySelector("#expensePayer"),
-  splitAll: document.querySelector("#splitAll"),
-  splitList: document.querySelector("#splitList"),
-  expenseList: document.querySelector("#expenseList"),
   totalAmount: document.querySelector("#totalAmount"),
   summaryGrid: document.querySelector("#summaryGrid"),
   settlementCount: document.querySelector("#settlementCount"),
@@ -75,62 +69,23 @@ function bindEvents() {
   elements.participantForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const name = elements.participantName.value.trim();
+    const paidCents = parseMoneyInput(elements.participantAmount.value);
+
     if (!name) {
       showToast("Bitte einen Namen eintragen.");
       return;
     }
 
-    const id = makeId("p");
-    state.participants[id] = { id, name, createdAt: Date.now() };
-    elements.participantName.value = "";
-    persist();
-  });
-
-  elements.expenseForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const people = getParticipants();
-    if (people.length === 0) {
-      showToast("Bitte zuerst Personen hinzufügen.");
-      return;
-    }
-
-    const payerId = elements.expensePayer.value;
-    if (!state.participants[payerId]) {
-      showToast("Bitte auswählen, wer bezahlt hat.");
-      return;
-    }
-
-    const amountCents = parseMoneyInput(elements.expenseAmount.value);
-    if (!amountCents) {
+    if (paidCents === null) {
       showToast("Bitte einen gültigen Betrag eintragen.");
       return;
     }
 
-    const selectedParticipants = elements.splitAll.checked
-      ? people.map((person) => person.id)
-      : Array.from(elements.splitList.querySelectorAll("input:checked")).map((input) => input.value);
-
-    if (selectedParticipants.length === 0) {
-      showToast("Bitte mindestens eine Person auswählen.");
-      return;
-    }
-
-    const id = makeId("e");
-    state.expenses[id] = {
-      id,
-      title: elements.expenseTitle.value.trim() || "Ausgabe",
-      amountCents,
-      payerId,
-      participantIds: selectedParticipants,
-      createdAt: Date.now(),
-    };
-
-    elements.expenseForm.reset();
-    elements.splitAll.checked = true;
+    const id = makeId("p");
+    state.participants[id] = { id, name, paidCents, createdAt: Date.now() };
+    elements.participantForm.reset();
     persist();
   });
-
-  elements.splitAll.addEventListener("change", renderSplitList);
 
   document.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-action]");
@@ -150,16 +105,12 @@ function bindEvents() {
       await extendGroup();
     }
 
-    if (action === "rename-person") {
-      renameParticipant(id);
+    if (action === "edit-person") {
+      editParticipant(id);
     }
 
     if (action === "delete-person") {
       deleteParticipant(id);
-    }
-
-    if (action === "delete-expense") {
-      deleteExpense(id);
     }
   });
 }
@@ -175,7 +126,7 @@ async function loadGroup(groupId) {
 }
 
 async function createNewGroup({ askConfirmation }) {
-  const hasContent = getParticipants().length > 0 || getExpenses().length > 0;
+  const hasContent = getParticipants().length > 0;
   if (askConfirmation && hasContent && !window.confirm("Aktuelle Runde verlassen und eine neue starten?")) {
     return;
   }
@@ -222,34 +173,29 @@ async function extendGroup() {
   }
 }
 
-function renameParticipant(id) {
+function editParticipant(id) {
   const person = state.participants[id];
   if (!person) return;
 
-  const name = window.prompt("Neuer Name", person.name)?.trim();
-  if (!name || name === person.name) return;
+  const name = window.prompt("Name", person.name)?.trim();
+  if (!name) return;
 
-  state.participants[id] = { ...person, name };
+  const paidInput = window.prompt("Bezahlt", formatPlainMoney(person.paidCents || 0));
+  if (paidInput === null) return;
+
+  const paidCents = parseMoneyInput(paidInput);
+  if (paidCents === null) {
+    showToast("Bitte einen gültigen Betrag eintragen.");
+    return;
+  }
+
+  state.participants[id] = { ...person, name, paidCents };
   persist();
 }
 
 function deleteParticipant(id) {
-  const isUsed = getExpenses().some(
-    (expense) => expense.payerId === id || expense.participantIds.includes(id),
-  );
-
-  if (isUsed) {
-    showToast("Person ist in Ausgaben enthalten.");
-    return;
-  }
-
+  if (!state.participants[id]) return;
   delete state.participants[id];
-  persist();
-}
-
-function deleteExpense(id) {
-  if (!state.expenses[id]) return;
-  delete state.expenses[id];
   persist();
 }
 
@@ -266,6 +212,7 @@ async function copyShareLink() {
 
 function persist() {
   state.updatedAt = Date.now();
+  state.expenses = {};
   render();
   scheduleSave();
 }
@@ -373,7 +320,6 @@ async function fetchJson(url, options = {}) {
 
 function render() {
   const people = getParticipants();
-  const expenses = getExpenses();
   const result = calculateResult();
 
   setFieldValue(elements.eventTitle, state.title);
@@ -385,10 +331,7 @@ function render() {
 
   renderExpiry();
   renderParticipants(people, result);
-  renderPayerSelect(people);
-  renderSplitList();
-  renderExpenses(expenses);
-  renderSummary(result);
+  renderSummary(people, result);
   renderSettlements(result);
 }
 
@@ -416,15 +359,17 @@ function renderParticipants(people, result) {
   elements.participantList.innerHTML = people
     .map((person) => {
       const paid = result.paidByPerson[person.id] || 0;
+      const owed = result.owedByPerson[person.id] || 0;
       return `
         <div class="person-row">
           <div class="person-main">
             <div class="person-name">${escapeHtml(person.name)}</div>
-            <div class="person-meta">Bezahlt: ${formatMoney(paid)}</div>
+            <div class="person-meta">Bezahlt: ${formatMoney(paid)} · Anteil: ${formatMoney(owed)}</div>
           </div>
+          <strong class="person-paid">${formatMoney(paid)}</strong>
           <div class="row-actions">
-            <button class="button small secondary" type="button" data-action="rename-person" data-id="${person.id}">Umbenennen</button>
-            <button class="button small danger" type="button" data-action="delete-person" data-id="${person.id}">Entfernen</button>
+            <button class="icon-button secondary" type="button" data-action="edit-person" data-id="${person.id}" aria-label="${escapeHtml(person.name)} bearbeiten" title="Bearbeiten">✎</button>
+            <button class="icon-button danger" type="button" data-action="delete-person" data-id="${person.id}" aria-label="${escapeHtml(person.name)} entfernen" title="Entfernen">×</button>
           </div>
         </div>
       `;
@@ -432,67 +377,7 @@ function renderParticipants(people, result) {
     .join("");
 }
 
-function renderPayerSelect(people) {
-  const previousValue = elements.expensePayer.value;
-  elements.expensePayer.innerHTML = people
-    .map((person) => `<option value="${person.id}">${escapeHtml(person.name)}</option>`)
-    .join("");
-
-  if (state.participants[previousValue]) {
-    elements.expensePayer.value = previousValue;
-  }
-
-  elements.expensePayer.disabled = people.length === 0;
-}
-
-function renderSplitList() {
-  const people = getParticipants();
-  const disabled = elements.splitAll.checked;
-  elements.splitList.classList.toggle("disabled", disabled);
-  elements.splitList.innerHTML = people
-    .map(
-      (person) => `
-        <label class="split-chip">
-          <input type="checkbox" value="${person.id}" ${disabled ? "checked disabled" : "checked"} />
-          <span>${escapeHtml(person.name)}</span>
-        </label>
-      `,
-    )
-    .join("");
-}
-
-function renderExpenses(expenses) {
-  if (expenses.length === 0) {
-    elements.expenseList.innerHTML = `<div class="empty-state">Noch keine Ausgaben.</div>`;
-    return;
-  }
-
-  elements.expenseList.innerHTML = expenses
-    .map((expense) => {
-      const payer = state.participants[expense.payerId]?.name || "Unbekannt";
-      const splitNames = expense.participantIds
-        .map((id) => state.participants[id]?.name)
-        .filter(Boolean)
-        .join(", ");
-
-      return `
-        <div class="expense-row">
-          <div class="expense-main">
-            <div class="expense-title">${escapeHtml(expense.title)}</div>
-            <div class="expense-meta">${escapeHtml(payer)} · ${escapeHtml(splitNames || "Keine Aufteilung")}</div>
-          </div>
-          <div class="row-actions">
-            <strong class="expense-amount">${formatMoney(expense.amountCents)}</strong>
-            <button class="button small danger" type="button" data-action="delete-expense" data-id="${expense.id}">Löschen</button>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-}
-
-function renderSummary(result) {
-  const people = getParticipants();
+function renderSummary(people, result) {
   if (people.length === 0) {
     elements.summaryGrid.innerHTML = `<div class="empty-state">Noch keine Bilanz.</div>`;
     return;
@@ -501,14 +386,13 @@ function renderSummary(result) {
   elements.summaryGrid.innerHTML = people
     .map((person) => {
       const balance = result.balanceByPerson[person.id] || 0;
-      const owed = result.owedByPerson[person.id] || 0;
       const modifier = balance > 0 ? "positive" : balance < 0 ? "negative" : "neutral";
       const prefix = balance > 0 ? "+" : "";
       return `
         <div class="summary-row ${modifier}">
           <div>
             <div class="person-name">${escapeHtml(person.name)}</div>
-            <div class="summary-meta">Anteil: ${formatMoney(owed)}</div>
+            <div class="summary-meta">Bezahlt: ${formatMoney(result.paidByPerson[person.id] || 0)}</div>
           </div>
           <strong class="summary-amount">${prefix}${formatMoney(balance)}</strong>
         </div>
@@ -541,25 +425,15 @@ function renderSettlements(result) {
 
 function calculateResult() {
   const people = getParticipants();
-  const validIds = new Set(people.map((person) => person.id));
-  const paidByPerson = Object.fromEntries(people.map((person) => [person.id, 0]));
+  const paidByPerson = Object.fromEntries(people.map((person) => [person.id, Number(person.paidCents) || 0]));
   const owedByPerson = Object.fromEntries(people.map((person) => [person.id, 0]));
-  let totalCents = 0;
+  const totalCents = people.reduce((sum, person) => sum + (Number(person.paidCents) || 0), 0);
 
-  for (const expense of getExpenses()) {
-    if (!validIds.has(expense.payerId)) continue;
-
-    const participantIds = expense.participantIds.filter((id) => validIds.has(id));
-    if (participantIds.length === 0) continue;
-
-    paidByPerson[expense.payerId] += expense.amountCents;
-    totalCents += expense.amountCents;
-
-    const baseShare = Math.floor(expense.amountCents / participantIds.length);
-    const remainder = expense.amountCents % participantIds.length;
-
-    participantIds.forEach((id, index) => {
-      owedByPerson[id] += baseShare + (index < remainder ? 1 : 0);
+  if (people.length > 0) {
+    const baseShare = Math.floor(totalCents / people.length);
+    const remainder = totalCents % people.length;
+    people.forEach((person, index) => {
+      owedByPerson[person.id] = baseShare + (index < remainder ? 1 : 0);
     });
   }
 
@@ -606,7 +480,7 @@ function calculateResult() {
 function createEmptyState(id = "") {
   const timestamp = Date.now();
   return {
-    version: 1,
+    version: 2,
     id,
     title: "Abend",
     currency: "EUR",
@@ -620,22 +494,48 @@ function createEmptyState(id = "") {
 
 function normalizeState(rawState) {
   const fallback = createEmptyState(rawState?.id);
-  const participants = Array.isArray(rawState?.participants)
+  const rawParticipants = Array.isArray(rawState?.participants)
     ? Object.fromEntries(rawState.participants.map((person) => [person.id, person]))
     : rawState?.participants || {};
-  const expenses = Array.isArray(rawState?.expenses)
+  const legacyExpenses = Array.isArray(rawState?.expenses)
     ? Object.fromEntries(rawState.expenses.map((expense) => [expense.id, expense]))
     : rawState?.expenses || {};
+  const legacyPaidByPerson = sumLegacyExpenses(legacyExpenses);
+  const hasDirectPayments = Object.values(rawParticipants).some((person) => person.paidCents !== undefined);
+  const participants = Object.fromEntries(
+    Object.values(rawParticipants).map((person) => [
+      person.id,
+      {
+        ...person,
+        paidCents: normalizeCents(hasDirectPayments ? person.paidCents : legacyPaidByPerson[person.id]),
+      },
+    ]),
+  );
 
   return {
     ...fallback,
     ...rawState,
+    version: 2,
     title: rawState?.title || fallback.title,
     currency: sanitizeCurrency(rawState?.currency || fallback.currency),
     participants,
-    expenses,
+    expenses: hasDirectPayments ? {} : legacyExpenses,
     expiresAt: Number(rawState?.expiresAt || fallback.expiresAt),
   };
+}
+
+function sumLegacyExpenses(expenses) {
+  return Object.values(expenses || {}).reduce((totals, expense) => {
+    if (expense?.payerId) {
+      totals[expense.payerId] = (totals[expense.payerId] || 0) + normalizeCents(expense.amountCents);
+    }
+    return totals;
+  }, {});
+}
+
+function normalizeCents(value) {
+  const cents = Number(value) || 0;
+  return cents > 0 ? Math.round(cents) : 0;
 }
 
 function canExtendCurrentGroup() {
@@ -646,10 +546,6 @@ function canExtendCurrentGroup() {
 
 function getParticipants() {
   return Object.values(state.participants || {}).sort((a, b) => a.createdAt - b.createdAt);
-}
-
-function getExpenses() {
-  return Object.values(state.expenses || {}).sort((a, b) => b.createdAt - a.createdAt);
 }
 
 function getGroupIdFromUrl() {
@@ -689,7 +585,7 @@ function parseMoneyInput(input) {
 
   normalized = normalized.replace(/[^0-9.-]/g, "");
   const value = Number(normalized);
-  if (!Number.isFinite(value) || value <= 0) return 0;
+  if (!Number.isFinite(value) || value < 0) return null;
   return Math.round(value * 100);
 }
 
@@ -699,6 +595,13 @@ function formatMoney(cents) {
     style: "currency",
     currency,
   }).format(cents / 100);
+}
+
+function formatPlainMoney(cents) {
+  return new Intl.NumberFormat("de-DE", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  }).format((Number(cents) || 0) / 100);
 }
 
 function formatDateTime(timestamp) {

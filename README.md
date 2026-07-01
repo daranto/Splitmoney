@@ -5,9 +5,11 @@ SplitMoney ist eine kleine Selfhost-App für gemeinsame Ausgaben. Es gibt keinen
 ## Funktionen
 
 - Eindeutiger Gruppenlink pro Runde
-- Personen hinzufügen, umbenennen und entfernen
-- Ausgaben mit zahlender Person und optionaler Teilgruppe erfassen
+- Personen mit gezahltem Betrag hinzufügen
+- Namen und gezahlte Beträge bearbeiten
+- Personen entfernen
 - Gesamtsumme, Personenbilanz und minimale Überweisungen berechnen
+- Live-Hinweis, bis alle Beträge eingetragen sind
 - SQLite-Datenbank im Docker-Volume
 - Links laufen standardmäßig nach 4 Wochen ab
 - Verlängerung um eine Woche innerhalb der letzten 7 Tage
@@ -67,4 +69,4 @@ Neue Runden laufen nach 4 Wochen ab. Das Ablaufdatum steht oben in der App. Inne
 
 ## Berechnung
 
-Jede Ausgabe wird centgenau auf die ausgewählten Personen verteilt. Wenn ein Betrag nicht glatt teilbar ist, werden die Rest-Cents in der Reihenfolge der Personen vergeben. Danach werden positive und negative Bilanzen gegeneinander verrechnet, sodass möglichst wenige Überweisungen entstehen.
+Alle eingetragenen Beträge werden addiert und gleichmäßig auf alle Personen verteilt. Wenn die Gesamtsumme nicht glatt teilbar ist, werden die Rest-Cents in der Reihenfolge der Personen vergeben. Danach werden positive und negative Bilanzen gegeneinander verrechnet, sodass möglichst wenige Überweisungen entstehen.
